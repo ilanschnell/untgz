@@ -249,27 +249,27 @@ void safetyStrip(char * fname)
  */
 void getFullName(union tar_buffer *buffer, char *fname)
 {
-        int len = 0;
+    int len = 0;
 
-        /* NOTE: prepend buffer.head.prefix if tar archive expected to have it */
-        if (*(buffer->header.prefix) && (*(buffer->header.prefix) != ' '))
+    /* NOTE: prepend buffer.head.prefix if tar archive expected to have it */
+    if (*(buffer->header.prefix) && (*(buffer->header.prefix) != ' '))
+    {
+        /* copy over prefix */
+        strncpy(fname,buffer->header.prefix, sizeof(buffer->header.prefix));
+        fname[sizeof(buffer->header.prefix)-1] = '\0';
+        /* ensure ends in dir separator, implied after if full prefix size used */
+        len = strlen(fname)-1; /* assumed by test above at least 1 character */
+        if ((fname[len]!='/') && (fname[len]!='\\'))
         {
-                /* copy over prefix */
-                strncpy(fname,buffer->header.prefix, sizeof(buffer->header.prefix));
-                fname[sizeof(buffer->header.prefix)-1] = '\0';
-                /* ensure ends in dir separator, implied after if full prefix size used */
-                len = strlen(fname)-1; /* assumed by test above at least 1 character */
-                if ((fname[len]!='/') && (fname[len]!='\\'))
-                {
-                        len++;
-                        fname[len]='/';
-                }
-                len++; /* index of 1st character after dir separator */
+            len++;
+            fname[len]='/';
         }
+        len++; /* index of 1st character after dir separator */
+    }
 
-        /* copy over filename portion */
-        strncpy(fname+len,buffer->header.name, sizeof(buffer->header.name));
-        fname[len+sizeof(buffer->header.name)-1] = '\0'; /* ensure terminated */
+    /* copy over filename portion */
+    strncpy(fname+len,buffer->header.name, sizeof(buffer->header.name));
+    fname[len+sizeof(buffer->header.name)-1] = '\0'; /* ensure terminated */
 }
 
 
