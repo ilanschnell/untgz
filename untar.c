@@ -269,7 +269,7 @@ void getFullName(union tar_buffer *buffer, char *fname)
 
     /* copy over filename portion */
     strncpy(fname+len,buffer->header.name, sizeof(buffer->header.name));
-    fname[len+sizeof(buffer->header.name)-1] = '\0'; /* ensure terminated */
+    fname[len+sizeof(buffer->header.name)] = '\0'; /* ensure terminated */
 }
 
 
