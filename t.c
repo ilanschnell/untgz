@@ -127,27 +127,26 @@ int ExprMatch(char *string,char *expr)
 */
 int valid_checksum(struct tar_header *header)
 {
-  unsigned hdrchksum = (unsigned)getoct(header->chksum,8);
-  signed schksum = 0;
-  unsigned uchksum = 0;
-  int i;
+    unsigned hdrchksum = (unsigned) getoct(header->chksum, 8);
+    signed schksum = 0;
+    unsigned uchksum = 0;
+    int i;
 
-  for (i=0; i < sizeof(struct tar_header); i++)
-  {
-    unsigned char val = ((unsigned char *)header)[i];
-    if ((i >= 148) && (i < 156)) /* chksum */
+    for (i = 0; i < sizeof(struct tar_header); i++)
     {
-      val = ' ';
+        unsigned char val = ((unsigned char *)header)[i];
+        if ((i >= 148) && (i < 156)) /* chksum */
+        {
+            val = ' ';
+        }
+        schksum += (signed char)val;
+        uchksum += val;
     }
-    schksum += (signed char)val;
-    uchksum += val;
-  }
 
-  if (hdrchksum == uchksum) return 1;
-  if ((int)hdrchksum == schksum) return 2;
-  return 0;
+    if (hdrchksum == uchksum) return 1;
+    if ((int)hdrchksum == schksum) return 2;
+    return 0;
 }
-
 
 
 /* combines elements from tar header to produce
@@ -209,57 +208,21 @@ char * stripPath(int path_sep_cnt, char *fname)
 
 gzFile infile;
 
-/* Initialize decompression library (if needed)
-   0=success, nonzero means error during initialization
- */
-int cm_init(gzFile in, int cm)
-{
-  infile = in; /* save gzFile for reading/cleanup */
-
-  switch (cm)
-  {
-    default: /* CM_NONE, CM_GZ */
-      return 0; /* success */
-  }
-}
-
-
-/* properly cleanup any resources decompression library allocated
- */
-void cm_cleanup(int cm)
-{
-  switch (cm)
-  {
-    default: /* CM_NONE, CM_GZ */
-      break;
-  }
-
-  /* close the input stream */
-  if (gzclose(infile) != Z_OK)
-  {
-      printf("failed gzclose");
-    /* return -1; */
-  }
-}
-
 
 /* Reads in a single TAR block
  */
 long readBlock(int cm, void *buffer)
 {
   long len = -1;
-  switch (cm)
-  {
-    default: /* CM_NONE, CM_GZ */
-      len = gzread(infile, buffer, BLOCKSIZE);
-      break;
-  }
+
+  len = gzread(infile, buffer, BLOCKSIZE);
+
+  printf("len = %d\n", len);
 
   /* check for read errors and abort */
   if (len < 0)
   {
-      printf("gzread: error decompressing");
-      cm_cleanup(cm);
+      printf("gzread: error decompressing\n");
       return -1;
   }
   /*
@@ -268,9 +231,8 @@ long readBlock(int cm, void *buffer)
    */
   if (len != BLOCKSIZE)
   {
-      printf("gzread: incomplete block read");
-    cm_cleanup(cm);
-    return -1;
+      printf("gzread: incomplete block read\n");
+      return -1;
   }
 
   return len; /* success */
@@ -304,12 +266,7 @@ int tgz_extract(gzFile in, int cm)
   time_t        tartime;
 
   /* do any prep work for extracting from compressed TAR file */
-  if (cm_init(in, cm))
-  {
-      printf("tgz_extract: unable to initialize decompression method.");
-      cm_cleanup(cm);
-      return -1;
-  }
+  infile = in;
 
   while (1)
   {
@@ -330,8 +287,7 @@ int tgz_extract(gzFile in, int cm)
       /* compute and check header checksum, support signed or unsigned */
       if (!valid_checksum(&(buffer.header)))
       {
-          printf("tgz_extract: bad header checksum");
-          cm_cleanup(cm);
+          printf("tgz_extract: bad header checksum\n");
           return -1;
       }
 
@@ -354,19 +310,16 @@ int tgz_extract(gzFile in, int cm)
         buffer.header.name[SHORTNAMESIZE-1] = '\0';
         if (lstrcmp(fs, buffer.header.name) != 0)
         {
-            printf("tgz_extract: mismatched long filename");
-            cm_cleanup(cm);
+            printf("tgz_extract: mismatched long filename\n");
             return -1;
         }
 #else
         printf("tgz_extract: using GNU long filename [%s]", fname);
 #endif
       }
-      /* LogMessage("buffer.header.name is:");  LogMessage(fname); */
+      printf("fname: '%s'\n", fname);
     }
   } /* while(1) */
-
-  cm_cleanup(cm);
 
   return 0;
 }
@@ -374,6 +327,10 @@ int tgz_extract(gzFile in, int cm)
 
 int main()
 {
-    tgz_extract("t.tar.gz", 0);
+    gzFile *x;
+
+    x = gzopen("t.tar.gz", "rb");
+    tgz_extract(x, 0);
+    gzclose(x);
     return 0;
 }
