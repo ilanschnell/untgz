@@ -269,7 +269,7 @@ int tgz_extract(gzFile in, int cm)
   while (1)
   {
     if (readBlock(cm, &buffer) < 0) return -1;
-    
+
     /*
      * If we have to get a tar header
      */
@@ -281,20 +281,19 @@ int tgz_extract(gzFile in, int cm)
          * we are done
          */
         if (/* (len == 0)  || */ (buffer.header.name[0]== 0)) break;
-        
+
         /* compute and check header checksum, support signed or unsigned */
         if (!valid_checksum(&(buffer.header)))
         {
             printf("tgz_extract: bad header checksum\n");
             return -1;
         }
-        
+
         /* copy over filename chunk from header, avoiding overruns */
         if (getheader == 1) /* use normal (short or posix long) filename from header */
         {
             /* NOTE: prepends any prefix, including separator, and ensures terminated */
             getFullName(&buffer, fname);
-            printf("fname: '%s'\n", fname);
         }
         else /* use (GNU) long filename that preceeded this header */
         {
@@ -310,11 +309,14 @@ int tgz_extract(gzFile in, int cm)
                 return -1;
             }
 #else
-            printf("tgz_extract: using GNU long filename [%s]\n", fname);
+            //printf("tgz_extract: using GNU long filename [%s]\n", fname);
 #endif
         }
         /* LogMessage("buffer.header.name is:");  LogMessage(fname); */
-        
+
+        //printf("fname: '%s' (%d)\n", fname, (int) strlen(fname));
+        printf("%s\n", fname);
+
         switch (buffer.header.typeflag)
         {
         case DIRTYPE:
@@ -327,7 +329,7 @@ int tgz_extract(gzFile in, int cm)
             /* Note: a file ending with a / may actually be a BSD tar directory entry */
             if (fname[strlen(fname)-1] == '/')
                 goto dirEntry;
-            
+
             remaining = getoct(buffer.header.size,12);
 
             if (remaining > 0)
@@ -337,7 +339,7 @@ int tgz_extract(gzFile in, int cm)
             setTimeAndCloseFile:
                 getheader = 1;
             }
-            
+
             break;
         case GNUTYPE_LONGLINK:
         case GNUTYPE_LONGNAME:
@@ -362,13 +364,13 @@ int tgz_extract(gzFile in, int cm)
     {
         unsigned int bytes = (remaining > BLOCKSIZE) ? BLOCKSIZE : remaining;
         unsigned long bwritten;
-        
+
         remaining -= bytes;
         if (remaining == 0)
             goto setTimeAndCloseFile;
     }
   } /* while(1) */
-  
+
   return 0;
 }
 
