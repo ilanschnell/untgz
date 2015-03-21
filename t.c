@@ -142,7 +142,7 @@ int valid_checksum(struct tar_header *header)
         schksum += (signed char)val;
         uchksum += val;
     }
-    printf("chksum: %d %d %d\n", hdrchksum, schksum, uchksum);
+    /* printf("chksum: %d %d %d\n", hdrchksum, schksum, uchksum); */
 
     if (hdrchksum == uchksum) return 1;
     if ((int)hdrchksum == schksum) return 2;
@@ -218,8 +218,6 @@ long readBlock(int cm, void *buffer)
 
   len = gzread(infile, buffer, BLOCKSIZE);
 
-  printf("len = %d\n", len);
-
   /* check for read errors and abort */
   if (len < 0)
   {
@@ -288,19 +286,19 @@ int tgz_extract(gzFile in, int cm)
         /* compute and check header checksum, support signed or unsigned */
         if (!valid_checksum(&(buffer.header)))
         {
-            PrintMessage(_T("tgz_extract: bad header checksum"));
-            cm_cleanup(cm);
+            printf("tgz_extract: bad header checksum\n");
             return -1;
         }
         
         /* store time, so we can set the timestamp on files */
-        tartime = (time_t)getoct(buffer.header.mtime,12);
+        tartime = (time_t)getoct(buffer.header.mtime, 12);
         
         /* copy over filename chunk from header, avoiding overruns */
         if (getheader == 1) /* use normal (short or posix long) filename from header */
         {
             /* NOTE: prepends any prefix, including separator, and ensures terminated */
             getFullName(&buffer, fname);
+            printf("fname: '%s'\n", fname);
         }
         else /* use (GNU) long filename that preceeded this header */
         {
@@ -312,26 +310,19 @@ int tgz_extract(gzFile in, int cm)
             buffer.header.name[SHORTNAMESIZE-1] = '\0';
             if (lstrcmp(fs, buffer.header.name) != 0)
             {
-                PrintMessage(_T("tgz_extract: mismatched long filename"));
-                cm_cleanup(cm);
+                printf("tgz_extract: mismatched long filename\n");
                 return -1;
             }
 #else
-            PrintMessage(_T("tgz_extract: using GNU long filename [%s]"), _A2T(fname));
+            printf("tgz_extract: using GNU long filename [%s]", fname);
 #endif
         }
         /* LogMessage("buffer.header.name is:");  LogMessage(fname); */
-        
         
         switch (buffer.header.typeflag)
         {
         case DIRTYPE:
         dirEntry:
-            if (!junkPaths)
-            {
-                safetyStrip(fname);
-                makedir(fname);
-            }
             break;
         case LNKTYPE:   /* hard link */
         case CONTTYPE:  /* contiguous file, for compatibility treat as normal */
@@ -342,134 +333,13 @@ int tgz_extract(gzFile in, int cm)
                 goto dirEntry;
             
             remaining = getoct(buffer.header.size,12);
-            if ( /* add (remaining > 0) && to ignore 0 zero byte files */
-                ( (iList == NULL) || (matchname(fname, iCnt, iList, junkPaths)) ) &&
-                (!matchname(fname, xCnt, xList, junkPaths))
-                )
-            {
-                if (!junkPaths) /* if we want to use paths as stored */
-                {
-                    /* try creating directory */
-                    char *p = strrchr(fname, '/');
-                    if (p != NULL)
-                    {
-                        *p = '\0';
-                        makedir(fname);
-                        *p = '/';
-                    }
-                }
-                else
-                {
-                    /* try ignoring directory */
-                    char *p = strrchr(fname, '/');
-                    if (p != NULL)
-                    {
-                        /* be sure terminating '\0' is copied and */
-                        /* use ansi memcpy equivalent that handles overlapping regions */
-                        MoveMemory(fname, p+1, strlen(p+1) + 1 );
-                    }
-                }
-                if (*fname) /* if after stripping path a fname still exists */
-                {
-                    /* Attempt to open the output file and report action taken to user */
-                    const TCHAR szERRMsg[] = _T("Error: Could not create file "),
-                        szSUCMsg[] = _T("Writing "),
-                        szSKPMsg[] = _T("Skipping ");
-                    const TCHAR * szMsg = szSUCMsg;
-                    
-                    safetyStrip(fname);
-                    
-                    if (buffer.header.typeflag == LNKTYPE)
-                    {
-                        outfile = INVALID_HANDLE_VALUE;
-                        /* create a hardlink if possible, else produce just a warning unless failOnHardLinks is true */
-                        if (!MakeHardLink(fname, buffer.header.linkname))
-                        {
-                            PrintMessage(_T("Warning: unable to create hard link %s [%d]"), _A2T(fname), GetLastError());
-                            if (failOnHardLinks)
-                            {
-                                cm_cleanup(cm);
-                                return -3;
-                            }
-                        }
-                        else
-                        {
-                            outfile = CreateFileA(fname,GENERIC_WRITE,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
-                            goto setTimeAndCloseFile;
-                        }
-                    } else
-                    {
-                        /* Open the file for writing mode, creating if doesn't exist and truncating if exists and overwrite mode */
-                        outfile = CreateFileA(fname,GENERIC_WRITE,FILE_SHARE_READ,NULL,(keep==OVERWRITE)?CREATE_ALWAYS:CREATE_NEW,FILE_ATTRIBUTE_NORMAL,NULL);
-                        
-                        /* failed to open file, either valid error (like open) or it already exists and in a keep mode */
-                        if (outfile == INVALID_HANDLE_VALUE)
-                        {
-                            /* if skip existing or only update existing and failed to open becauses exists */
-                            if ((keep!=OVERWRITE) && (GetLastError()==ERROR_FILE_EXISTS))
-                            {
-                                /* assume skipping initially (mode==SKIP or ==UPDATE with existing file newer) */
-                                szMsg = szSKPMsg; /* and update output message accordingly */
-                                
-                                /* if in update mode, check filetimes and reopen in overwrite mode */
-                                if (keep == UPDATE)
-                                {
-                                    FILETIME ftm_a;
-                                    HANDLE h;
-                                    WIN32_FIND_DATAA ffData;
-                                    
-                                    cnv_tar2win_time(tartime, &ftm_a); /* archive file time */
-                                    h = FindFirstFileA(fname, &ffData); /* existing file time */
-                                    
-                                    if (h!=INVALID_HANDLE_VALUE)
-                                        FindClose(h);  /* cleanup search handle */
-                                    else
-                                        goto ERR_OPENING;
-                                    
-                                    /* compare date+times, is one in tarball newer? */
-                                    if (*((LONGLONG *)&ftm_a) > *((LONGLONG *)&(ffData.ftLastWriteTime)))
-                                    {
-                                        outfile = CreateFileA(fname,GENERIC_WRITE,FILE_SHARE_READ,NULL,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
-                                        if (outfile == INVALID_HANDLE_VALUE) goto ERR_OPENING;
-                                        szMsg = szSUCMsg;
-                                    }
-                                }
-                            }
-                            else /* in overwrite mode or failed for some other error than exists */
-                            {
-                            ERR_OPENING:
-                                PrintMessage(_T("%s%s [%d]"), szERRMsg, _A2T(fname), GetLastError());
-                                cm_cleanup(cm);
-                                return -2;
-                            }
-                        }
-                        
-                        /* Inform user of current extraction action (writing, skipping file XYZ) */
-                        PrintMessage(_T("%s%s"), szMsg, _A2T(fname));
-                    }
-                }
-            }
-            else
-                outfile = INVALID_HANDLE_VALUE;
-            
-            /*
-             * could have no contents, in which case we close the file and set the times
-             */
+
             if (remaining > 0)
                 getheader = 0;
             else
             {
             setTimeAndCloseFile:
                 getheader = 1;
-                if (outfile != INVALID_HANDLE_VALUE)
-                {
-                    FILETIME ftm;
-                    
-                    cnv_tar2win_time(tartime, &ftm);
-                    SetFileTime(outfile,&ftm,NULL,&ftm);
-                    CloseHandle(outfile);
-                    outfile = INVALID_HANDLE_VALUE;
-                }
             }
             
             break;
@@ -479,10 +349,10 @@ int tgz_extract(gzFile in, int cm)
             remaining = getoct(buffer.header.size,12);
             if (readBlock(cm, fname) < 0) return -1;
             fname[BLOCKSIZE-1] = '\0';
-            if ((remaining >= BLOCKSIZE) || ((unsigned)strlen(fname) > remaining))
+            if ((remaining >= BLOCKSIZE) ||
+                ((unsigned)strlen(fname) > remaining))
             {
-                PrintMessage(_T("tgz_extract: invalid long name"));
-                cm_cleanup(cm);
+                printf("tgz_extract: invalid long name\n");
                 return -1;
             }
             getheader = 2;
@@ -500,22 +370,10 @@ int tgz_extract(gzFile in, int cm)
     {
         unsigned int bytes = (remaining > BLOCKSIZE) ? BLOCKSIZE : remaining;
         unsigned long bwritten;
-
-        if (outfile != INVALID_HANDLE_VALUE)
-        {
-            WriteFile(outfile,buffer.buffer,bytes,&bwritten,NULL);
-            if (bwritten != bytes)
-            {
-                PrintMessage(_T("Error: write failed for %s"), _A2T(fname));
-                CloseHandle(outfile);
-                DeleteFileA(fname);
-                
-                cm_cleanup(cm);
-                return -2;
-            }
-        }
+        
         remaining -= bytes;
-        if (remaining == 0) goto setTimeAndCloseFile;
+        if (remaining == 0)
+            goto setTimeAndCloseFile;
     }
   } /* while(1) */
   
