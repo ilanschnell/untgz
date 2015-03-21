@@ -262,7 +262,6 @@ int tgz_extract(gzFile in, int cm)
   union         tar_buffer buffer;
   unsigned long remaining;
   char          fname[BLOCKSIZE]; /* must be >= BLOCKSIZE bytes */
-  time_t        tartime;
 
   /* do any prep work for extracting from compressed TAR file */
   infile = in;
@@ -289,9 +288,6 @@ int tgz_extract(gzFile in, int cm)
             printf("tgz_extract: bad header checksum\n");
             return -1;
         }
-        
-        /* store time, so we can set the timestamp on files */
-        tartime = (time_t)getoct(buffer.header.mtime, 12);
         
         /* copy over filename chunk from header, avoiding overruns */
         if (getheader == 1) /* use normal (short or posix long) filename from header */
@@ -359,10 +355,6 @@ int tgz_extract(gzFile in, int cm)
             break;
         }
         default:
-/*
-  if (action == TGZ_LIST)
-  printf(" %s     <---> %s\n",strtime(&tartime),fname);
-*/
             break;
         }
     }
