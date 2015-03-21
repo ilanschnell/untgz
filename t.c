@@ -314,7 +314,7 @@ int tgz_extract(gzFile in, int cm)
                 return -1;
             }
 #else
-            printf("tgz_extract: using GNU long filename [%s]", fname);
+            printf("tgz_extract: using GNU long filename [%s]\n", fname);
 #endif
         }
         /* LogMessage("buffer.header.name is:");  LogMessage(fname); */
@@ -385,7 +385,7 @@ int main()
 {
     gzFile *x;
 
-    x = gzopen("ncurses.tar.gz", "rb");
+    x = gzopen("cryptography-0.8-py27_0.tar", "rb");
     tgz_extract(x, 0);
     gzclose(x);
     return 0;
