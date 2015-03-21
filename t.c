@@ -62,22 +62,22 @@
 
 /* help functions */
 
-unsigned long getoct(char *p,int width)
+unsigned long getoct(char *p, int width)
 {
   unsigned long result = 0;
   char c;
 
   while (width --)
-    {
+  {
       c = *p++;
       if (c == ' ') /* ignore padding */
-        continue;
+          continue;
       if (c == 0)   /* ignore padding, but also marks end of string */
-        break;
+          break;
       if (c < '0' || c > '7')
-        return result; /* really an error, but we just ignore invalid values */
+          return result; /* really an error, but we just ignore invalid values */
       result = result * 8 + (c - '0');
-    }
+  }
   return result;
 }
 
@@ -142,6 +142,7 @@ int valid_checksum(struct tar_header *header)
         schksum += (signed char)val;
         uchksum += val;
     }
+    printf("chksum: %d %d %d\n", hdrchksum, schksum, uchksum);
 
     if (hdrchksum == uchksum) return 1;
     if ((int)hdrchksum == schksum) return 2;
@@ -292,7 +293,7 @@ int tgz_extract(gzFile in, int cm)
       }
 
       /* store time, so we can set the timestamp on files */
-      tartime = (time_t)getoct(buffer.header.mtime,12);
+      tartime = (time_t) getoct(buffer.header.mtime, 12);
 
       /* copy over filename chunk from header, avoiding overruns */
       if (getheader == 1) /* use normal (short or posix long) filename from header */
@@ -329,7 +330,7 @@ int main()
 {
     gzFile *x;
 
-    x = gzopen("t.tar.gz", "rb");
+    x = gzopen("ncurses.tar.gz", "rb");
     tgz_extract(x, 0);
     gzclose(x);
     return 0;
